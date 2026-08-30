@@ -225,6 +225,14 @@ textarea::placeholder {
   .app {
     flex-direction: column;
   }
+  /* dissolve .main so the topbar becomes a sibling of the sidebar and can sit above it */
+  .main {
+    display: contents;
+  }
+  .topbar {
+    order: -1;
+    padding: 0.75rem 1.25rem 0.5rem;
+  }
   .sidebar {
     width: 100%;
     height: auto;
