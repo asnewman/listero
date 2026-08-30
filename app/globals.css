@@ -60,10 +60,6 @@ textarea {
   color: var(--fg);
 }
 
-.btn:hover {
-  background: var(--bg-2);
-}
-
 .btn.new {
   text-align: left;
 }
@@ -83,7 +79,6 @@ textarea {
   border-radius: 6px;
 }
 
-.nav li:hover,
 .nav li.active {
   background: var(--bg-2);
 }
@@ -111,17 +106,28 @@ textarea {
   color: var(--muted);
   padding: 0.2rem 0.5rem;
   cursor: pointer;
-  opacity: 0;
   line-height: 1;
 }
 
-.nav li:hover .nav-delete,
-.nav li.active .nav-delete {
-  opacity: 1;
-}
-
-.nav-delete:hover {
-  color: var(--fg);
+/* touch devices have no hover: a tap that would reveal something is swallowed as a
+   hover, so the list needs a second tap. Keep hover styling off of them entirely. */
+@media (hover: hover) {
+  .btn:hover {
+    background: var(--bg-2);
+  }
+  .nav li:hover {
+    background: var(--bg-2);
+  }
+  .nav-delete {
+    opacity: 0;
+  }
+  .nav li:hover .nav-delete,
+  .nav li.active .nav-delete {
+    opacity: 1;
+  }
+  .nav-delete:hover {
+    color: var(--fg);
+  }
 }
 
 .muted {
@@ -236,5 +242,32 @@ textarea::placeholder {
   input,
   textarea {
     font-size: 16px;
+  }
+}
+
+/* indent/outdent for touch keyboards, which have no Tab key. `bottom` is set inline
+   to the keyboard height so the bar rides above it. */
+.touchbar {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .touchbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding: 0.5rem 1.25rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+    background: var(--bg-2);
+    border-top: 1px solid var(--line);
+  }
+  .touchbar .btn {
+    min-width: 3rem;
+    padding: 0.5rem 0.7rem;
+    line-height: 1;
   }
 }

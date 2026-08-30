@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MAX_DEPTH, newItem, type List, type ListItem } from "@/lib/types";
 
 type Patch = Pick<List, "title" | "items">;
@@ -9,6 +9,8 @@ type Focus = { id: string; pos: number };
 
 export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const keyboardInset = useKeyboardInset();
   const titleRef = useRef<HTMLInputElement>(null);
   const items = list.items;
 
@@ -31,6 +33,35 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
     if (d === 0) return;
     const end = subtreeEnd(i);
     setItems(items.map((it, k) => (k >= i && k < end ? { ...it, depth: Math.max(0, it.depth + d) } : it)));
+  };
+
+  /** Move items[i] and its subtree past the sibling above (dir -1) or below (dir 1). */
+  const moveItem = (i: number, dir: -1 | 1, pos: number) => {
+    const item = items[i];
+    const end = subtreeEnd(i);
+    const block = items.slice(i, end);
+    let next: ListItem[];
+    if (dir < 0) {
+      let j = i - 1;
+      while (j >= 0 && items[j].depth > item.depth) j--;
+      if (j < 0 || items[j].depth < item.depth) return; // no sibling above
+      next = [...items.slice(0, j), ...block, ...items.slice(j, i), ...items.slice(end)];
+    } else {
+      if (end >= items.length || items[end].depth < item.depth) return; // no sibling below
+      const after = subtreeEnd(end);
+      next = [...items.slice(0, i), ...items.slice(end, after), ...block, ...items.slice(after)];
+    }
+    setItems(next, { id: item.id, pos });
+  };
+
+  /** Indent/outdent the row holding the caret — for the touch toolbar, which has no Tab key. */
+  const nudgeDepth = (delta: number) => {
+    const i = items.findIndex((it) => it.id === editingId);
+    if (i < 0) return;
+    const el = document.activeElement;
+    const pos = el instanceof HTMLTextAreaElement ? el.selectionStart : items[i].text.length;
+    shiftDepth(i, delta);
+    setFocus({ id: items[i].id, pos });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, i: number) => {
@@ -73,6 +104,11 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
 
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       const up = e.key === "ArrowUp";
+      if (e.shiftKey) {
+        e.preventDefault();
+        moveItem(i, up ? -1 : 1, start);
+        return;
+      }
       const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 24;
       const wrapped = el.clientHeight >= lineHeight * 2;
       const atEdge = up ? start === 0 : start === el.value.length;
@@ -117,11 +153,44 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
             onFocused={() => setFocus(null)}
             onText={(t) => handleText(i, t)}
             onKeyDown={(e) => handleKeyDown(e, i)}
+            onEnter={() => setEditingId(item.id)}
+            onLeave={() => setEditingId((cur) => (cur === item.id ? null : cur))}
           />
         ))}
       </div>
+      {editingId && (
+        <div className="touchbar" style={{ bottom: keyboardInset }}>
+          {/* pointerdown is cancelled so tapping never blurs the row being edited */}
+          <button className="btn" aria-label="Outdent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(-1)}>
+            &#8676;
+          </button>
+          <button className="btn" aria-label="Indent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(1)}>
+            &#8677;
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+/** Height of the on-screen keyboard, so fixed UI can sit on top of it instead of behind it. */
+function useKeyboardInset() {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  return inset;
 }
 
 type RowProps = {
@@ -130,9 +199,11 @@ type RowProps = {
   onFocused: () => void;
   onText: (text: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onEnter: () => void;
+  onLeave: () => void;
 };
 
-function Row({ item, focus, onFocused, onText, onKeyDown }: RowProps) {
+function Row({ item, focus, onFocused, onText, onKeyDown, onEnter, onLeave }: RowProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useLayoutEffect(() => {
@@ -161,6 +232,8 @@ function Row({ item, focus, onFocused, onText, onKeyDown }: RowProps) {
         value={item.text}
         onChange={(e) => onText(e.target.value)}
         onKeyDown={onKeyDown}
+        onFocus={onEnter}
+        onBlur={onLeave}
         spellCheck={false}
       />
     </div>
