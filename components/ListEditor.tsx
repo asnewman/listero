@@ -1,0 +1,168 @@
+"use client";
+
+import { useLayoutEffect, useRef, useState } from "react";
+import { MAX_DEPTH, newItem, type List, type ListItem } from "@/lib/types";
+
+type Patch = Pick<List, "title" | "items">;
+type Props = { list: List; autoFocusTitle?: boolean; onChange: (patch: Patch) => void };
+type Focus = { id: string; pos: number };
+
+export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
+  const [focus, setFocus] = useState<Focus | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const items = list.items;
+
+  const setItems = (next: ListItem[], nextFocus?: Focus) => {
+    onChange({ title: list.title, items: next });
+    if (nextFocus) setFocus(nextFocus);
+  };
+
+  /** Index just past the subtree rooted at `i` (following items deeper than items[i]). */
+  const subtreeEnd = (i: number) => {
+    let j = i + 1;
+    while (j < items.length && items[j].depth > items[i].depth) j++;
+    return j;
+  };
+
+  const shiftDepth = (i: number, delta: number) => {
+    const maxDepth = i === 0 ? 0 : Math.min(items[i - 1].depth + 1, MAX_DEPTH);
+    const target = Math.max(0, Math.min(items[i].depth + delta, maxDepth));
+    const d = target - items[i].depth;
+    if (d === 0) return;
+    const end = subtreeEnd(i);
+    setItems(items.map((it, k) => (k >= i && k < end ? { ...it, depth: Math.max(0, it.depth + d) } : it)));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, i: number) => {
+    const el = e.currentTarget;
+    const item = items[i];
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const before = item.text.slice(0, start);
+      const after = item.text.slice(end);
+      const hasChildren = i + 1 < items.length && items[i + 1].depth > item.depth;
+      const created = newItem(hasChildren && after === "" ? item.depth + 1 : item.depth, after);
+      const next = [...items];
+      next.splice(i, 1, { ...item, text: before }, created);
+      setItems(next, { id: created.id, pos: 0 });
+      return;
+    }
+
+    if (e.key === "Tab") {
+      e.preventDefault();
+      shiftDepth(i, e.shiftKey ? -1 : 1);
+      return;
+    }
+
+    if (e.key === "Backspace" && start === 0 && end === 0) {
+      if (i > 0) {
+        e.preventDefault();
+        const prev = items[i - 1];
+        const next = [...items];
+        next.splice(i - 1, 2, { ...prev, text: prev.text + item.text });
+        setItems(next, { id: prev.id, pos: prev.text.length });
+      } else if (item.text === "" && items.length > 1) {
+        e.preventDefault();
+        setItems(items.slice(1), { id: items[1].id, pos: 0 });
+      }
+      return;
+    }
+
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      const up = e.key === "ArrowUp";
+      const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 24;
+      const wrapped = el.clientHeight >= lineHeight * 2;
+      const atEdge = up ? start === 0 : start === el.value.length;
+      if (wrapped && !atEdge) return;
+      const j = up ? i - 1 : i + 1;
+      if (j >= items.length) return;
+      e.preventDefault();
+      if (j < 0) {
+        titleRef.current?.focus();
+        return;
+      }
+      setFocus({ id: items[j].id, pos: Math.min(start, items[j].text.length) });
+    }
+  };
+
+  const handleText = (i: number, text: string) => {
+    setItems(items.map((it, k) => (k === i ? { ...it, text } : it)));
+  };
+
+  return (
+    <div className="editor">
+      <input
+        ref={titleRef}
+        className="title"
+        autoFocus={autoFocusTitle}
+        value={list.title}
+        placeholder="Untitled"
+        onChange={(e) => onChange({ title: e.target.value, items })}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === "ArrowDown") {
+            e.preventDefault();
+            setFocus({ id: items[0].id, pos: 0 });
+          }
+        }}
+      />
+      <div className="items">
+        {items.map((item, i) => (
+          <Row
+            key={item.id}
+            item={item}
+            focus={focus?.id === item.id ? focus : null}
+            onFocused={() => setFocus(null)}
+            onText={(t) => handleText(i, t)}
+            onKeyDown={(e) => handleKeyDown(e, i)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type RowProps = {
+  item: ListItem;
+  focus: Focus | null;
+  onFocused: () => void;
+  onText: (text: string) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+};
+
+function Row({ item, focus, onFocused, onText, onKeyDown }: RowProps) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [item.text, item.depth]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !focus) return;
+    el.focus();
+    el.setSelectionRange(focus.pos, focus.pos);
+    onFocused();
+  }, [focus, onFocused]);
+
+  return (
+    <div className="item" style={{ paddingLeft: `${item.depth * 1.5}rem` }}>
+      <span className="bullet" aria-hidden>
+        {item.depth % 2 === 0 ? "•" : "◦"}
+      </span>
+      <textarea
+        ref={ref}
+        rows={1}
+        value={item.text}
+        onChange={(e) => onText(e.target.value)}
+        onKeyDown={onKeyDown}
+        spellCheck={false}
+      />
+    </div>
+  );
+}
