@@ -54,14 +54,25 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
     setItems(next, { id: item.id, pos });
   };
 
-  /** Indent/outdent the row holding the caret — for the touch toolbar, which has no Tab key. */
-  const nudgeDepth = (delta: number) => {
+  /** Row holding the caret — the touch toolbar acts on it, having no keyboard to act through. */
+  const editing = () => {
     const i = items.findIndex((it) => it.id === editingId);
-    if (i < 0) return;
+    if (i < 0) return null;
     const el = document.activeElement;
-    const pos = el instanceof HTMLTextAreaElement ? el.selectionStart : items[i].text.length;
-    shiftDepth(i, delta);
-    setFocus({ id: items[i].id, pos });
+    return { i, pos: el instanceof HTMLTextAreaElement ? el.selectionStart : items[i].text.length };
+  };
+
+  const nudgeDepth = (delta: number) => {
+    const at = editing();
+    if (!at) return;
+    shiftDepth(at.i, delta);
+    setFocus({ id: items[at.i].id, pos: at.pos });
+  };
+
+  const nudgeMove = (dir: -1 | 1) => {
+    const at = editing();
+    if (!at) return;
+    moveItem(at.i, dir, at.pos);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, i: number) => {
@@ -161,12 +172,22 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
       {editingId && (
         <div className="touchbar" style={{ bottom: keyboardInset }}>
           {/* pointerdown is cancelled so tapping never blurs the row being edited */}
-          <button className="btn" aria-label="Outdent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(-1)}>
-            &#8676;
-          </button>
-          <button className="btn" aria-label="Indent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(1)}>
-            &#8677;
-          </button>
+          <div className="touchbar-group">
+            <button className="btn" aria-label="Move up" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeMove(-1)}>
+              &#8593;
+            </button>
+            <button className="btn" aria-label="Move down" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeMove(1)}>
+              &#8595;
+            </button>
+          </div>
+          <div className="touchbar-group">
+            <button className="btn" aria-label="Outdent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(-1)}>
+              &#8676;
+            </button>
+            <button className="btn" aria-label="Indent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(1)}>
+              &#8677;
+            </button>
+          </div>
         </div>
       )}
     </div>
