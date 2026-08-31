@@ -77,6 +77,30 @@ textarea {
   display: flex;
   align-items: center;
   border-radius: 6px;
+  position: relative;
+}
+
+.nav li.folder {
+  display: block;
+}
+
+.folder-row {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  position: relative;
+}
+
+.nav .sub {
+  padding-left: 0.9rem;
+  margin-top: 2px;
+}
+
+.chevron {
+  display: inline-block;
+  width: 1rem;
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .nav li.active {
@@ -100,7 +124,8 @@ textarea {
   color: var(--accent);
 }
 
-.nav-delete {
+.nav-delete,
+.nav-menu-btn {
   background: none;
   border: 0;
   color: var(--muted);
@@ -109,23 +134,99 @@ textarea {
   line-height: 1;
 }
 
+.nav-menu-btn {
+  padding: 0.2rem 0.2rem;
+}
+
+.sidebar-new {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sidebar-new .btn {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.folder-new input {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  outline: none;
+}
+
+.menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 10rem;
+  max-width: 14rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.menu button {
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  text-align: left;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu button:hover {
+  background: var(--line);
+}
+
+.menu-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem 0.1rem;
+}
+
+.folder-row.drag-over {
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--muted);
+}
+
+.sidebar.drag-over-root {
+  box-shadow: inset 0 0 0 1px var(--muted);
+}
+
 /* touch devices have no hover: a tap that would reveal something is swallowed as a
    hover, so the list needs a second tap. Keep hover styling off of them entirely. */
 @media (hover: hover) {
   .btn:hover {
     background: var(--bg-2);
   }
-  .nav li:hover {
+  .nav li:not(.folder):hover,
+  .folder-row:hover {
     background: var(--bg-2);
   }
-  .nav-delete {
+  .nav-delete,
+  .nav-menu-btn {
     opacity: 0;
   }
-  .nav li:hover .nav-delete,
-  .nav li.active .nav-delete {
+  .nav li:not(.folder):hover > .nav-delete,
+  .nav li.active > .nav-delete,
+  .folder-row:hover > .nav-delete,
+  .nav li:not(.folder):hover > .nav-menu-btn,
+  .nav li.active > .nav-menu-btn,
+  .folder-row:hover > .nav-menu-btn {
     opacity: 1;
   }
-  .nav-delete:hover {
+  .nav-delete:hover,
+  .nav-menu-btn:hover {
     color: var(--fg);
   }
 }
