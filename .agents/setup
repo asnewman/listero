@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+setup_started=$SECONDS
+
+if [[ ! -f .env.local ]]; then
+  cp -- .env.example .env.local
+  printf 'Created .env.local from .env.example; add project credentials to enable Clerk and Postgres.\n'
+else
+  printf 'Keeping existing .env.local.\n'
+fi
+
+dependency_hash="$(sha256sum package.json package-lock.json | sha256sum | cut -d ' ' -f 1)"
+dependency_marker="node_modules/.amp-setup-dependency-hash"
+
+if [[ -f "$dependency_marker" ]] && [[ "$(<"$dependency_marker")" == "$dependency_hash" ]]; then
+  printf 'Dependencies already match package.json and package-lock.json.\n'
+else
+  install_started=$SECONDS
+  npm_spec="$(node -p "require('./package.json').packageManager")"
+  printf 'Installing dependencies with %s...\n' "$npm_spec"
+  npx --yes "$npm_spec" ci --prefer-offline --no-audit --no-fund
+  printf '%s\n' "$dependency_hash" > "$dependency_marker"
+  printf 'Dependency installation completed in %ss.\n' "$((SECONDS - install_started))"
+fi
+
+printf 'Orb setup completed in %ss.\n' "$((SECONDS - setup_started))"

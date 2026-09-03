@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# listero has no per-wake authentication, reconnection, or repair work.

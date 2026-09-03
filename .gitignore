@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Amp
+/.amp/portals/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
