@@ -18,6 +18,7 @@ A writing canvas that only allows lists.
 - `Tab` / `Shift+Tab` — indent / outdent (moves nested items with it)
 - `Backspace` at the start of an item — merge into the previous item
 - `↑` / `↓` — move between items
+- `@yesterday` / `@today` / `@tomorrow` — add a date tag that updates as time passes
 
 ## Deploy (Vercel)
 

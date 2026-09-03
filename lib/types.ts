@@ -1,7 +1,14 @@
+export type DateTag = {
+  start: number;
+  end: number;
+  date: string;
+};
+
 export type ListItem = {
   id: string;
   text: string;
   depth: number;
+  dateTags?: DateTag[];
 };
 
 export type List = {
@@ -33,7 +40,7 @@ export function newId(): string {
 }
 
 export function newItem(depth = 0, text = ""): ListItem {
-  return { id: newId(), text, depth };
+  return { id: newId(), text, depth, dateTags: [] };
 }
 
 export function newList(folderId: string | null = null): List {

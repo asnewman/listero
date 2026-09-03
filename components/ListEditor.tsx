@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  localDateKey,
+  mergeDateTaggedItems,
+  resolveDateTags,
+  splitDateTaggedItem,
+  updateDateTaggedText,
+} from "@/lib/date-tags";
 import { MAX_DEPTH, newItem, type List, type ListItem } from "@/lib/types";
 
 type Patch = Pick<List, "title" | "items">;
@@ -10,9 +17,10 @@ type Focus = { id: string; pos: number };
 export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
   const [focus, setFocus] = useState<Focus | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const today = useLocalDate();
   const keyboardInset = useKeyboardInset();
   const titleRef = useRef<HTMLInputElement>(null);
-  const items = list.items;
+  const items = list.items.map((item) => resolveDateTags(item, today));
 
   const setItems = (next: ListItem[], nextFocus?: Focus) => {
     onChange({ title: list.title, items: next });
@@ -83,12 +91,11 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
 
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      const before = item.text.slice(0, start);
-      const after = item.text.slice(end);
+      const [before, after] = splitDateTaggedItem(item, start, end, today);
       const hasChildren = i + 1 < items.length && items[i + 1].depth > item.depth;
-      const created = newItem(hasChildren && after === "" ? item.depth + 1 : item.depth, after);
+      const created = { ...newItem(hasChildren && after.text === "" ? item.depth + 1 : item.depth, after.text), ...after };
       const next = [...items];
-      next.splice(i, 1, { ...item, text: before }, created);
+      next.splice(i, 1, { ...item, ...before }, created);
       setItems(next, { id: created.id, pos: 0 });
       return;
     }
@@ -103,8 +110,9 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
       if (i > 0) {
         e.preventDefault();
         const prev = items[i - 1];
+        const merged = mergeDateTaggedItems(prev, item, today);
         const next = [...items];
-        next.splice(i - 1, 2, { ...prev, text: prev.text + item.text });
+        next.splice(i - 1, 2, { ...prev, ...merged });
         setItems(next, { id: prev.id, pos: prev.text.length });
       } else if (item.text === "" && items.length > 1) {
         e.preventDefault();
@@ -136,7 +144,7 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
   };
 
   const handleText = (i: number, text: string) => {
-    setItems(items.map((it, k) => (k === i ? { ...it, text } : it)));
+    setItems(items.map((it, k) => (k === i ? updateDateTaggedText(it, text, today) : it)));
   };
 
   return (
@@ -194,6 +202,33 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
   );
 }
 
+/** Current local calendar day, refreshed at midnight and after returning to the tab. */
+function useLocalDate() {
+  const [today, setToday] = useState(localDateKey);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleMidnight = () => {
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      timer = setTimeout(() => {
+        setToday(localDateKey());
+        scheduleMidnight();
+      }, midnight.getTime() - now.getTime() + 100);
+    };
+    const refresh = () => setToday(localDateKey());
+
+    scheduleMidnight();
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
+
+  return today;
+}
+
 /** Height of the on-screen keyboard, so fixed UI can sit on top of it instead of behind it. */
 function useKeyboardInset() {
   const [inset, setInset] = useState(0);
@@ -247,16 +282,40 @@ function Row({ item, focus, onFocused, onText, onKeyDown, onEnter, onLeave }: Ro
       <span className="bullet" aria-hidden>
         {item.depth % 2 === 0 ? "•" : "◦"}
       </span>
-      <textarea
-        ref={ref}
-        rows={1}
-        value={item.text}
-        onChange={(e) => onText(e.target.value)}
-        onKeyDown={onKeyDown}
-        onFocus={onEnter}
-        onBlur={onLeave}
-        spellCheck={false}
-      />
+      <div className="item-text">
+        <HighlightedText item={item} />
+        <textarea
+          ref={ref}
+          rows={1}
+          value={item.text}
+          onChange={(e) => onText(e.target.value)}
+          onKeyDown={onKeyDown}
+          onFocus={onEnter}
+          onBlur={onLeave}
+          spellCheck={false}
+        />
+      </div>
+    </div>
+  );
+}
+
+function HighlightedText({ item }: { item: ListItem }) {
+  const content: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const tag of item.dateTags ?? []) {
+    content.push(item.text.slice(cursor, tag.start));
+    content.push(
+      <span className="date-tag" key={`${tag.start}-${tag.date}`}>
+        {item.text.slice(tag.start, tag.end)}
+      </span>,
+    );
+    cursor = tag.end;
+  }
+  content.push(item.text.slice(cursor));
+  if (item.text.endsWith("\n")) content.push("\u200b");
+  return (
+    <div className="item-render" aria-hidden>
+      {content}
     </div>
   );
 }

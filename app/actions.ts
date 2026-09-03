@@ -2,9 +2,10 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { and, desc, eq } from "drizzle-orm";
+import { isValidDateTag } from "@/lib/date-tags";
 import { getDb } from "@/lib/db";
 import { folders, lists } from "@/lib/db/schema";
-import { MAX_DEPTH, type Folder, type List, type ListItem, type ListPatch } from "@/lib/types";
+import { MAX_DEPTH, type DateTag, type Folder, type List, type ListItem, type ListPatch } from "@/lib/types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -18,6 +19,17 @@ function assertId(id: unknown): asserts id is string {
   if (typeof id !== "string" || !UUID.test(id)) throw new Error("Invalid id");
 }
 
+function cleanDateTags(value: unknown, text: string): DateTag[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error("Invalid date tags");
+  let previousEnd = 0;
+  return value.map((raw) => {
+    if (!isValidDateTag(text, raw) || raw.start < previousEnd) throw new Error("Invalid date tag");
+    previousEnd = raw.end;
+    return { start: raw.start, end: raw.end, date: raw.date };
+  });
+}
+
 function cleanItems(items: unknown): ListItem[] {
   if (!Array.isArray(items)) throw new Error("Invalid items");
   return items.map((raw) => {
@@ -25,7 +37,8 @@ function cleanItems(items: unknown): ListItem[] {
     assertId(it.id);
     if (typeof it.text !== "string") throw new Error("Invalid item text");
     const depth = Number.isInteger(it.depth) ? Math.min(Math.max(it.depth as number, 0), MAX_DEPTH) : 0;
-    return { id: it.id, text: it.text, depth };
+    const dateTags = cleanDateTags(it.dateTags, it.text);
+    return dateTags === undefined ? { id: it.id, text: it.text, depth } : { id: it.id, text: it.text, depth, dateTags };
   });
 }
 
