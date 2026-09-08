@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Folder, List } from "@/lib/types";
+import HighlightedDateText from "./HighlightedDateText";
 
 type Drag = { kind: "list" | "folder"; id: string };
 
@@ -217,7 +218,7 @@ export default function Sidebar({
       {...dropProps(l.folderId ?? null)}
     >
       <button className="nav-item" onClick={() => onSelect(l.id)} title={l.title || "Untitled"}>
-        {l.title || <span className="muted">Untitled</span>}
+        {l.title ? <HighlightedDateText text={l.title} dateTags={l.titleDateTags} /> : <span className="muted">Untitled</span>}
       </button>
       <button
         className="nav-menu-btn"

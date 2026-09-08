@@ -2,6 +2,7 @@
 
 import { SignInButton, UserButton } from "@clerk/nextjs";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { localDateKey, resolveDateTags } from "@/lib/date-tags";
 import type { ListStore } from "@/lib/store/types";
 import { newFolder, newItem, newList, type Folder, type List } from "@/lib/types";
 import ListEditor from "./ListEditor";
@@ -17,6 +18,7 @@ export default function Workspace({ store, signedIn }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const today = useLocalDate();
 
   const listsRef = useRef<List[]>([]);
   const foldersRef = useRef<Folder[]>([]);
@@ -59,7 +61,14 @@ export default function Workspace({ store, signedIn }: Props) {
       timers.current.delete(id);
       const list = listsRef.current.find((l) => l.id === id);
       if (!list) return;
-      store.update(id, { title: list.title, items: list.items, updatedAt: list.updatedAt }).then(() => setError(null), fail);
+      store
+        .update(id, {
+          title: list.title,
+          titleDateTags: list.titleDateTags,
+          items: list.items,
+          updatedAt: list.updatedAt,
+        })
+        .then(() => setError(null), fail);
     },
     [store, fail],
   );
@@ -86,7 +95,7 @@ export default function Workspace({ store, signedIn }: Props) {
     setFolders(next);
   };
 
-  const handleChange = (id: string, patch: Pick<List, "title" | "items">) => {
+  const handleChange = (id: string, patch: Pick<List, "title" | "titleDateTags" | "items">) => {
     commit(listsRef.current.map((l) => (l.id === id ? { ...l, ...patch, updatedAt: Date.now() } : l)));
     const existing = timers.current.get(id);
     if (existing) clearTimeout(existing);
@@ -141,12 +150,16 @@ export default function Workspace({ store, signedIn }: Props) {
     store.removeFolder(id).then(() => setError(null), fail);
   };
 
-  const active = lists?.find((l) => l.id === activeId) ?? null;
+  const displayedLists = (lists ?? []).map((list) => {
+    const title = resolveDateTags({ text: list.title, dateTags: list.titleDateTags }, today);
+    return { ...list, title: title.text, titleDateTags: title.dateTags };
+  });
+  const active = displayedLists.find((l) => l.id === activeId) ?? null;
 
   return (
     <div className="app">
       <Sidebar
-        lists={lists ?? []}
+        lists={displayedLists}
         folders={folders}
         activeId={activeId}
         onSelect={setActiveId}
@@ -172,6 +185,7 @@ export default function Workspace({ store, signedIn }: Props) {
           <ListEditor
             key={active.id}
             list={active}
+            today={today}
             autoFocusTitle={active.id === createdId}
             onChange={(patch) => handleChange(active.id, patch)}
           />
@@ -185,4 +199,32 @@ export default function Workspace({ store, signedIn }: Props) {
       </main>
     </div>
   );
+}
+
+/** Current local calendar day, refreshed at midnight and after returning to the tab. */
+function useLocalDate() {
+  const [today, setToday] = useState(localDateKey);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = () => setToday(localDateKey());
+    const scheduleMidnight = () => {
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      timer = setTimeout(() => {
+        refresh();
+        scheduleMidnight();
+      }, midnight.getTime() - now.getTime() + 100);
+    };
+
+    refresh();
+    scheduleMidnight();
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
+
+  return today;
 }

@@ -100,7 +100,7 @@ function completeDateTags(text: string, candidates: DateTag[], today: string): D
 }
 
 /** Re-label stored absolute dates for the user's current local calendar day. */
-export function resolveDateTags(item: ListItem, today: string): ListItem {
+export function resolveDateTags<T extends DateTaggedText>(item: T, today: string): T {
   const stored = validStoredTags(item.text, item.dateTags);
   if (stored.length === 0) return item.dateTags ? { ...item, dateTags: [] } : item;
 
@@ -119,7 +119,7 @@ export function resolveDateTags(item: ListItem, today: string): ListItem {
 }
 
 /** Preserve unaffected ranges through one textarea edit and recognize newly typed relative tags. */
-export function updateDateTaggedText(item: ListItem, text: string, today: string): ListItem {
+export function updateDateTaggedText<T extends DateTaggedText>(item: T, text: string, today: string): T {
   let prefix = 0;
   while (prefix < item.text.length && prefix < text.length && item.text[prefix] === text[prefix]) prefix++;
 

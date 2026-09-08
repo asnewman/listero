@@ -14,6 +14,7 @@ export type ListItem = {
 export type List = {
   id: string;
   title: string;
+  titleDateTags?: DateTag[];
   items: ListItem[];
   folderId: string | null;
   createdAt: number;
@@ -29,6 +30,7 @@ export type Folder = {
 
 export type ListPatch = {
   title: string;
+  titleDateTags?: DateTag[];
   items: ListItem[];
   updatedAt: number;
 };
@@ -45,7 +47,7 @@ export function newItem(depth = 0, text = ""): ListItem {
 
 export function newList(folderId: string | null = null): List {
   const now = Date.now();
-  return { id: newId(), title: "", items: [newItem()], folderId, createdAt: now, updatedAt: now };
+  return { id: newId(), title: "", titleDateTags: [], items: [newItem()], folderId, createdAt: now, updatedAt: now };
 }
 
 export function newFolder(name: string, parentId: string | null): Folder {

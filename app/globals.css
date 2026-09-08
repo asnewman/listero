@@ -274,15 +274,33 @@ textarea {
   padding: 1rem 2rem 6rem;
 }
 
+.title-text {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
 .title {
+  position: relative;
   width: 100%;
   background: none;
   border: 0;
   outline: 0;
   padding: 0.25rem 0;
-  margin-bottom: 1rem;
+  margin: 0;
   font-size: 1.6rem;
   font-weight: 600;
+}
+
+.title-render {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 0.25rem 0;
+  color: transparent;
+  font-size: 1.6rem;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: pre;
 }
 
 .title::placeholder,

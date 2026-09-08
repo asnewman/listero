@@ -1,5 +1,5 @@
 import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import type { ListItem } from "@/lib/types";
+import type { DateTag, ListItem } from "@/lib/types";
 
 export const lists = pgTable(
   "lists",
@@ -7,6 +7,7 @@ export const lists = pgTable(
     id: uuid("id").primaryKey(),
     userId: text("user_id").notNull(),
     title: text("title").notNull().default(""),
+    titleDateTags: jsonb("title_date_tags").$type<DateTag[]>().notNull().default([]),
     items: jsonb("items").$type<ListItem[]>().notNull().default([]),
     folderId: uuid("folder_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

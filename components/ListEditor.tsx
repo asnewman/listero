@@ -2,28 +2,27 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  localDateKey,
   mergeDateTaggedItems,
   resolveDateTags,
   splitDateTaggedItem,
   updateDateTaggedText,
 } from "@/lib/date-tags";
 import { MAX_DEPTH, newItem, type List, type ListItem } from "@/lib/types";
+import HighlightedDateText from "./HighlightedDateText";
 
-type Patch = Pick<List, "title" | "items">;
-type Props = { list: List; autoFocusTitle?: boolean; onChange: (patch: Patch) => void };
+type Patch = Pick<List, "title" | "titleDateTags" | "items">;
+type Props = { list: List; today: string; autoFocusTitle?: boolean; onChange: (patch: Patch) => void };
 type Focus = { id: string; pos: number };
 
-export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
+export default function ListEditor({ list, today, autoFocusTitle, onChange }: Props) {
   const [focus, setFocus] = useState<Focus | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const today = useLocalDate();
   const keyboardInset = useKeyboardInset();
   const titleRef = useRef<HTMLInputElement>(null);
   const items = list.items.map((item) => resolveDateTags(item, today));
 
   const setItems = (next: ListItem[], nextFocus?: Focus) => {
-    onChange({ title: list.title, items: next });
+    onChange({ title: list.title, titleDateTags: list.titleDateTags, items: next });
     if (nextFocus) setFocus(nextFocus);
   };
 
@@ -147,22 +146,32 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
     setItems(items.map((it, k) => (k === i ? updateDateTaggedText(it, text, today) : it)));
   };
 
+  const handleTitle = (text: string) => {
+    const next = updateDateTaggedText({ text: list.title, dateTags: list.titleDateTags }, text, today);
+    onChange({ title: next.text, titleDateTags: next.dateTags, items });
+  };
+
   return (
     <div className="editor">
-      <input
-        ref={titleRef}
-        className="title"
-        autoFocus={autoFocusTitle}
-        value={list.title}
-        placeholder="Untitled"
-        onChange={(e) => onChange({ title: e.target.value, items })}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === "ArrowDown") {
-            e.preventDefault();
-            setFocus({ id: items[0].id, pos: 0 });
-          }
-        }}
-      />
+      <div className="title-text">
+        <div className="title-render" aria-hidden>
+          <HighlightedDateText text={list.title} dateTags={list.titleDateTags} />
+        </div>
+        <input
+          ref={titleRef}
+          className="title"
+          autoFocus={autoFocusTitle}
+          value={list.title}
+          placeholder="Untitled"
+          onChange={(e) => handleTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === "ArrowDown") {
+              e.preventDefault();
+              setFocus({ id: items[0].id, pos: 0 });
+            }
+          }}
+        />
+      </div>
       <div className="items">
         {items.map((item, i) => (
           <Row
@@ -200,33 +209,6 @@ export default function ListEditor({ list, autoFocusTitle, onChange }: Props) {
       )}
     </div>
   );
-}
-
-/** Current local calendar day, refreshed at midnight and after returning to the tab. */
-function useLocalDate() {
-  const [today, setToday] = useState(localDateKey);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const scheduleMidnight = () => {
-      const now = new Date();
-      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-      timer = setTimeout(() => {
-        setToday(localDateKey());
-        scheduleMidnight();
-      }, midnight.getTime() - now.getTime() + 100);
-    };
-    const refresh = () => setToday(localDateKey());
-
-    scheduleMidnight();
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, []);
-
-  return today;
 }
 
 /** Height of the on-screen keyboard, so fixed UI can sit on top of it instead of behind it. */
@@ -283,7 +265,9 @@ function Row({ item, focus, onFocused, onText, onKeyDown, onEnter, onLeave }: Ro
         {item.depth % 2 === 0 ? "•" : "◦"}
       </span>
       <div className="item-text">
-        <HighlightedText item={item} />
+        <div className="item-render" aria-hidden>
+          <HighlightedDateText text={item.text} dateTags={item.dateTags} />
+        </div>
         <textarea
           ref={ref}
           rows={1}
@@ -295,27 +279,6 @@ function Row({ item, focus, onFocused, onText, onKeyDown, onEnter, onLeave }: Ro
           spellCheck={false}
         />
       </div>
-    </div>
-  );
-}
-
-function HighlightedText({ item }: { item: ListItem }) {
-  const content: React.ReactNode[] = [];
-  let cursor = 0;
-  for (const tag of item.dateTags ?? []) {
-    content.push(item.text.slice(cursor, tag.start));
-    content.push(
-      <span className="date-tag" key={`${tag.start}-${tag.date}`}>
-        {item.text.slice(tag.start, tag.end)}
-      </span>,
-    );
-    cursor = tag.end;
-  }
-  content.push(item.text.slice(cursor));
-  if (item.text.endsWith("\n")) content.push("\u200b");
-  return (
-    <div className="item-render" aria-hidden>
-      {content}
     </div>
   );
 }

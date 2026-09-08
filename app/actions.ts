@@ -66,6 +66,7 @@ function toList(row: typeof lists.$inferSelect): List {
   return {
     id: row.id,
     title: row.title,
+    titleDateTags: row.titleDateTags,
     items: row.items,
     folderId: row.folderId,
     createdAt: row.createdAt.getTime(),
@@ -97,11 +98,13 @@ export async function createList(list: List): Promise<void> {
   const userId = await requireUserId();
   assertId(list.id);
   const folderId = cleanFolderId(list.folderId);
+  const title = cleanText(list.title);
   await assertFolderOwned(userId, folderId);
   await getDb().insert(lists).values({
     id: list.id,
     userId,
-    title: cleanText(list.title),
+    title,
+    titleDateTags: cleanDateTags(list.titleDateTags, title) ?? [],
     items: cleanItems(list.items),
     folderId,
     createdAt: new Date(list.createdAt),
@@ -112,9 +115,15 @@ export async function createList(list: List): Promise<void> {
 export async function updateList(id: string, patch: ListPatch): Promise<void> {
   const userId = await requireUserId();
   assertId(id);
+  const title = cleanText(patch.title);
   await getDb()
     .update(lists)
-    .set({ title: cleanText(patch.title), items: cleanItems(patch.items), updatedAt: new Date(patch.updatedAt) })
+    .set({
+      title,
+      titleDateTags: cleanDateTags(patch.titleDateTags, title) ?? [],
+      items: cleanItems(patch.items),
+      updatedAt: new Date(patch.updatedAt),
+    })
     .where(and(eq(lists.id, id), eq(lists.userId, userId)));
 }
 
