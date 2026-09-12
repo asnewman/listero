@@ -18,6 +18,8 @@ export default function Workspace({ store, signedIn }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const navToggleRef = useRef<HTMLButtonElement>(null);
   const today = useLocalDate();
 
   const listsRef = useRef<List[]>([]);
@@ -107,6 +109,7 @@ export default function Workspace({ store, signedIn }: Props) {
     commit([list, ...listsRef.current]);
     setActiveId(list.id);
     setCreatedId(list.id);
+    setNavOpen(false);
     store.create(list).then(() => setError(null), fail);
   };
 
@@ -157,12 +160,16 @@ export default function Workspace({ store, signedIn }: Props) {
   const active = displayedLists.find((l) => l.id === activeId) ?? null;
 
   return (
-    <div className="app">
+    <div className={"app" + (navOpen ? " nav-open" : "")}>
       <Sidebar
         lists={displayedLists}
         folders={folders}
         activeId={activeId}
-        onSelect={setActiveId}
+        onSelect={(id) => {
+          setActiveId(id);
+          setNavOpen(false);
+          if (navToggleRef.current?.offsetParent) navToggleRef.current.focus();
+        }}
         onCreate={handleCreate}
         onDelete={handleDelete}
         onCreateFolder={handleCreateFolder}
@@ -172,6 +179,15 @@ export default function Workspace({ store, signedIn }: Props) {
       />
       <main className="main">
         <header className="topbar">
+          <button
+            ref={navToggleRef}
+            className="btn nav-toggle"
+            aria-expanded={navOpen}
+            aria-controls="list-navigation new-folder"
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            <span aria-hidden="true">{navOpen ? "▾" : "▸"}</span> Lists
+          </button>
           <span className="status">{error ?? (signedIn ? "" : "Lists are saved in this browser only")}</span>
           {signedIn ? (
             <UserButton />

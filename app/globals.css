@@ -39,6 +39,10 @@ textarea {
 }
 
 /* sidebar */
+.nav-toggle {
+  display: none;
+}
+
 .sidebar {
   width: 230px;
   flex: none;
@@ -148,6 +152,14 @@ textarea {
 .sidebar-new .btn {
   flex: 1;
   white-space: nowrap;
+}
+
+.sidebar-new .new-folder {
+  flex: none;
+  align-self: center;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .folder-new input {
@@ -422,6 +434,15 @@ textarea::placeholder {
   .topbar {
     order: -1;
     padding: 0.75rem 1.25rem 0.5rem;
+    gap: 0.75rem;
+  }
+  .topbar > .btn {
+    flex-shrink: 0;
+  }
+  .nav-toggle {
+    display: block;
+    margin-right: auto;
+    min-height: 44px;
   }
   .sidebar {
     width: 100%;
@@ -429,6 +450,10 @@ textarea::placeholder {
     position: static;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+  .app:not(.nav-open) .sidebar > .nav,
+  .app:not(.nav-open) .new-folder {
+    display: none;
   }
   .editor {
     padding: 1rem 1.25rem 4rem;

@@ -284,6 +284,7 @@ export default function Sidebar({
 
   return (
     <aside
+      aria-label="Lists and folders"
       className={"sidebar" + (dragOver === "root" ? " drag-over-root" : "")}
       onDragOver={(e) => {
         if (!canDrop(null)) return;
@@ -304,11 +305,11 @@ export default function Sidebar({
         <button className="btn new" onClick={() => onCreate(null)}>
           + New list
         </button>
-        <button className="btn new" onClick={() => setNamingIn(null)}>
+        <button id="new-folder" className="btn new new-folder" onClick={() => setNamingIn(null)}>
           + New folder
         </button>
       </div>
-      <ul className="nav">{renderLevel(null)}</ul>
+      <ul id="list-navigation" className="nav">{renderLevel(null)}</ul>
     </aside>
   );
 }
