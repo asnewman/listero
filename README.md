@@ -19,6 +19,7 @@ A writing canvas that only allows lists.
 - `Backspace` at the start of an item — merge into the previous item
 - `↑` / `↓` — move between items
 - `@yesterday` / `@today` / `@tomorrow` — add a date tag to a title or item that updates as time passes
+- `@date` — open a calendar in a title or item; select a day to save a date tag, or press `Escape` to cancel
 
 ## Deploy (Vercel)
 

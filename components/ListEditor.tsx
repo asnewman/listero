@@ -2,13 +2,17 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  datePickerStart,
+  dateTagLabel,
   mergeDateTaggedItems,
   resolveDateTags,
+  selectDateTag,
   splitDateTaggedItem,
   updateDateTaggedText,
 } from "@/lib/date-tags";
 import { MAX_DEPTH, newItem, type List, type ListItem } from "@/lib/types";
 import HighlightedDateText from "./HighlightedDateText";
+import DatePicker from "./DatePicker";
 
 type Patch = Pick<List, "title" | "titleDateTags" | "items">;
 type Props = { list: List; today: string; autoFocusTitle?: boolean; onChange: (patch: Patch) => void };
@@ -20,6 +24,31 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
   const keyboardInset = useKeyboardInset();
   const titleRef = useRef<HTMLInputElement>(null);
   const items = list.items.map((item) => resolveDateTags(item, today));
+  const [datePicker, setDatePicker] = useState<{ id: string | null; start: number; el: HTMLInputElement | HTMLTextAreaElement } | null>(null);
+
+  const checkDatePicker = (id: string | null, el: HTMLInputElement | HTMLTextAreaElement) => {
+    const start = datePickerStart(el.value, el.selectionStart ?? 0);
+    if (start !== null) setDatePicker({ id, start, el });
+  };
+
+  const closeDatePicker = (date?: string) => {
+    if (!datePicker) return;
+    const { id, start, el } = datePicker;
+    if (date) {
+      if (id === null) {
+        const next = selectDateTag({ text: list.title, dateTags: list.titleDateTags }, start, date, today);
+        onChange({ title: next.text, titleDateTags: next.dateTags, items });
+      } else {
+        setItems(items.map((item) => item.id === id ? selectDateTag(item, start, date, today) : item));
+      }
+    }
+    setDatePicker(null);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + (date ? dateTagLabel(date, today).length : 5);
+      el.setSelectionRange(pos, pos);
+    });
+  };
 
   const setItems = (next: ListItem[], nextFocus?: Focus) => {
     onChange({ title: list.title, titleDateTags: list.titleDateTags, items: next });
@@ -163,7 +192,11 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
           autoFocus={autoFocusTitle}
           value={list.title}
           placeholder="Untitled"
-          onChange={(e) => handleTitle(e.target.value)}
+          onChange={(e) => {
+            handleTitle(e.target.value);
+            if (!(e.nativeEvent as InputEvent).isComposing) checkDatePicker(null, e.currentTarget);
+          }}
+          onCompositionEnd={(e) => checkDatePicker(null, e.currentTarget)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === "ArrowDown") {
               e.preventDefault();
@@ -180,12 +213,14 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
             focus={focus?.id === item.id ? focus : null}
             onFocused={() => setFocus(null)}
             onText={(t) => handleText(i, t)}
+            onDateTrigger={(el) => checkDatePicker(item.id, el)}
             onKeyDown={(e) => handleKeyDown(e, i)}
             onEnter={() => setEditingId(item.id)}
             onLeave={() => setEditingId((cur) => (cur === item.id ? null : cur))}
           />
         ))}
       </div>
+      {datePicker && <DatePicker today={today} onSelect={closeDatePicker} onCancel={() => closeDatePicker()} />}
       {editingId && (
         <div className="touchbar" style={{ bottom: keyboardInset }}>
           {/* pointerdown is cancelled so tapping never blurs the row being edited */}
@@ -236,12 +271,13 @@ type RowProps = {
   focus: Focus | null;
   onFocused: () => void;
   onText: (text: string) => void;
+  onDateTrigger: (el: HTMLTextAreaElement) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onEnter: () => void;
   onLeave: () => void;
 };
 
-function Row({ item, focus, onFocused, onText, onKeyDown, onEnter, onLeave }: RowProps) {
+function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter, onLeave }: RowProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useLayoutEffect(() => {
@@ -272,7 +308,11 @@ function Row({ item, focus, onFocused, onText, onKeyDown, onEnter, onLeave }: Ro
           ref={ref}
           rows={1}
           value={item.text}
-          onChange={(e) => onText(e.target.value)}
+          onChange={(e) => {
+            onText(e.target.value);
+            if (!(e.nativeEvent as InputEvent).isComposing) onDateTrigger(e.currentTarget);
+          }}
+          onCompositionEnd={(e) => onDateTrigger(e.currentTarget)}
           onKeyDown={onKeyDown}
           onFocus={onEnter}
           onBlur={onLeave}

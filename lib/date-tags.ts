@@ -52,6 +52,17 @@ function hasTokenBoundaries(text: string, start: number, end: number): boolean {
   return (start === 0 || !TOKEN_CHARACTER.test(text[start - 1])) && (end === text.length || !TOKEN_CHARACTER.test(text[end]));
 }
 
+export function datePickerStart(text: string, caret: number): number | null {
+  const start = caret - 5;
+  return start >= 0 && text.slice(start, caret) === "@date" && hasTokenBoundaries(text, start, caret) ? start : null;
+}
+
+export function selectDateTag<T extends DateTaggedText>(item: T, start: number, date: string, today: string): T {
+  const label = dateTagLabel(date, today);
+  const next = updateDateTaggedText(item, item.text.slice(0, start) + label + item.text.slice(start + 5), today);
+  return { ...next, dateTags: completeDateTags(next.text, [...(next.dateTags ?? []).filter((tag) => tag.start !== start), { start, end: start + label.length, date }], today) };
+}
+
 export function isValidDateTag(text: string, value: unknown): value is DateTag {
   if (!value || typeof value !== "object") return false;
   const tag = value as Partial<DateTag>;

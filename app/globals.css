@@ -354,6 +354,48 @@ textarea::placeholder {
   -webkit-box-decoration-break: clone;
 }
 
+.date-picker {
+  width: min(22rem, calc(100% - 2rem));
+  padding: 1.25rem;
+  background: var(--bg-2);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.date-picker::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+.date-picker h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.date-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.date-picker-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.date-picker-days .btn {
+  padding: 0.5rem 0;
+}
+
+.date-picker [aria-current="date"] {
+  background: var(--tag-bg);
+  border-color: var(--tag-line);
+}
+
 .item textarea {
   position: relative;
   width: 100%;
