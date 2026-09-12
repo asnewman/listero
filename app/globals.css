@@ -326,19 +326,31 @@ textarea::placeholder {
 }
 
 .item {
+  position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 0.6rem;
+  padding-left: 1.5rem;
+  background: var(--bg);
 }
 
-.bullet {
+.item-shaded {
+  background: var(--bg-2);
+}
+
+.continuations {
+  position: absolute;
+  top: calc(1.5em + 0.2rem);
+  left: 0;
   color: var(--muted);
   width: 0.9rem;
-  flex: none;
   text-align: center;
   line-height: 1.5;
-  padding: 0.2rem 0;
   user-select: none;
+  pointer-events: none;
+}
+
+.continuations span {
+  display: block;
 }
 
 .item-text {
@@ -351,7 +363,8 @@ textarea::placeholder {
   position: absolute;
   inset: 0;
   overflow-wrap: break-word;
-  padding: 0.2rem 0;
+  padding: 0.2rem 0 0.2rem 0.6rem;
+  text-indent: -0.6rem;
   color: transparent;
   line-height: 1.5;
   pointer-events: none;
@@ -409,13 +422,15 @@ textarea::placeholder {
 }
 
 .item textarea {
+  display: block;
   position: relative;
   width: 100%;
   background: none;
   border: 0;
   outline: 0;
   resize: none;
-  padding: 0.2rem 0;
+  padding: 0.2rem 0 0.2rem 0.6rem;
+  text-indent: -0.6rem;
   margin: 0;
   overflow: hidden;
   overflow-wrap: break-word;

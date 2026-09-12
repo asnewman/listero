@@ -279,12 +279,29 @@ type RowProps = {
 
 function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter, onLeave }: RowProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [lineCount, setLineCount] = useState(1);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = "0px";
-    el.style.height = `${el.scrollHeight}px`;
+    const resize = () => {
+      el.style.height = "0px";
+      const height = el.scrollHeight;
+      el.style.height = `${height}px`;
+      const style = getComputedStyle(el);
+      const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      setLineCount(Math.max(1, Math.round((height - padding) / parseFloat(style.lineHeight))));
+    };
+    resize();
+    let width = el.getBoundingClientRect().width;
+    const observer = new ResizeObserver(() => {
+      const nextWidth = el.getBoundingClientRect().width;
+      if (nextWidth === width) return;
+      width = nextWidth;
+      resize();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [item.text, item.depth]);
 
   useLayoutEffect(() => {
@@ -296,9 +313,14 @@ function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter
   }, [focus, onFocused]);
 
   return (
-    <div className="item" style={{ paddingLeft: `${item.depth * 1.5}rem` }}>
-      <span className="bullet" aria-hidden>
-        {item.depth % 2 === 0 ? "•" : "◦"}
+    <div
+      className={`item${item.depth % 2 === 1 ? " item-shaded" : ""}`}
+      style={{ marginLeft: `${item.depth * 1.5}rem` }}
+    >
+      <span className="continuations" aria-hidden>
+        {Array.from({ length: lineCount - 1 }, (_, i) => (
+          <span key={i}>↳</span>
+        ))}
       </span>
       <div className="item-text">
         <div className="item-render" aria-hidden>
