@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   datePickerStart,
   dateTagLabel,
@@ -21,6 +21,7 @@ type Focus = { id: string; pos: number };
 export default function ListEditor({ list, today, autoFocusTitle, onChange }: Props) {
   const [focus, setFocus] = useState<Focus | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const keyboardInset = useKeyboardInset();
   const titleRef = useRef<HTMLInputElement>(null);
   const items = list.items.map((item) => resolveDateTags(item, today));
   const [datePicker, setDatePicker] = useState<{ id: string | null; start: number; el: HTMLInputElement | HTMLTextAreaElement } | null>(null);
@@ -89,7 +90,7 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
     setItems(next, pos === undefined ? undefined : { id: item.id, pos });
   };
 
-  /** Keep the last selected row available after the keyboard is dismissed. */
+  /** The toolbar acts on the focused bullet without taking focus itself. */
   const editing = () => {
     const i = items.findIndex((it) => it.id === editingId);
     if (i < 0) return null;
@@ -185,25 +186,34 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
 
   return (
     <div className="editor">
-      <div className="touchbar" role="group" aria-label="Bullet controls">
-        {/* Preserve focus if typing, but do not reopen a dismissed keyboard. */}
-        <div className="touchbar-group">
-          <button className="btn" disabled={!editingId} aria-label="Move up" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeMove(-1)}>
-            &#8593;
-          </button>
-          <button className="btn" disabled={!editingId} aria-label="Move down" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeMove(1)}>
-            &#8595;
-          </button>
+      {editingId && keyboardInset !== null && (
+        <div
+          className="touchbar"
+          role="group"
+          aria-label="Bullet controls"
+          style={{ bottom: keyboardInset }}
+          // Cancel focus transfer on both touch and mouse; click still runs the action.
+          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <div className="touchbar-group">
+            <button className="btn" aria-label="Move up" onClick={() => nudgeMove(-1)}>
+              &#8593;
+            </button>
+            <button className="btn" aria-label="Move down" onClick={() => nudgeMove(1)}>
+              &#8595;
+            </button>
+          </div>
+          <div className="touchbar-group">
+            <button className="btn" aria-label="Outdent" onClick={() => nudgeDepth(-1)}>
+              &#8676;
+            </button>
+            <button className="btn" aria-label="Indent" onClick={() => nudgeDepth(1)}>
+              &#8677;
+            </button>
+          </div>
         </div>
-        <div className="touchbar-group">
-          <button className="btn" disabled={!editingId} aria-label="Outdent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(-1)}>
-            &#8676;
-          </button>
-          <button className="btn" disabled={!editingId} aria-label="Indent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(1)}>
-            &#8677;
-          </button>
-        </div>
-      </div>
+      )}
       <div className="title-text">
         <div className="title-render" aria-hidden>
           <HighlightedDateText text={list.title} dateTags={list.titleDateTags} />
@@ -238,12 +248,41 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
             onDateTrigger={(el) => checkDatePicker(item.id, el)}
             onKeyDown={(e) => handleKeyDown(e, i)}
             onEnter={() => setEditingId(item.id)}
+            onLeave={() => setEditingId((current) => current === item.id ? null : current)}
           />
         ))}
       </div>
       {datePicker && <DatePicker today={today} onSelect={closeDatePicker} onCancel={() => closeDatePicker()} />}
     </div>
   );
+}
+
+/** Keyboard visibility is separate from focus: dismissing it can leave a caret active. */
+function useKeyboardInset() {
+  const [inset, setInset] = useState<number | null>(null);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => {
+      const occludedHeight = window.innerHeight - viewport.height;
+      // Ignore browser chrome changes and pinch zoom, which also shrink the viewport.
+      setInset(Math.abs(viewport.scale - 1) < 0.01 && occludedHeight > 120
+        ? Math.max(0, occludedHeight - viewport.offsetTop)
+        : null);
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  return inset;
 }
 
 type RowProps = {
@@ -254,9 +293,10 @@ type RowProps = {
   onDateTrigger: (el: HTMLTextAreaElement) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onEnter: () => void;
+  onLeave: () => void;
 };
 
-function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter }: RowProps) {
+function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter, onLeave }: RowProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [lineCount, setLineCount] = useState(1);
 
@@ -316,6 +356,7 @@ function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter
           onCompositionEnd={(e) => onDateTrigger(e.currentTarget)}
           onKeyDown={onKeyDown}
           onFocus={onEnter}
+          onBlur={onLeave}
           spellCheck={false}
         />
       </div>

@@ -486,7 +486,7 @@ textarea::placeholder {
   }
 }
 
-/* Keep bullet controls above the title, independent of the software keyboard. */
+/* The editor sets bottom to the keyboard inset and only renders this while typing. */
 .touchbar {
   display: none;
 }
@@ -494,14 +494,14 @@ textarea::placeholder {
 @media (pointer: coarse) {
   .touchbar {
     display: flex;
-    position: sticky;
-    top: 0;
+    position: fixed;
+    left: 0;
+    right: 0;
     z-index: 10;
     justify-content: space-between;
-    padding: calc(0.5rem + env(safe-area-inset-top)) 0 0.5rem;
-    margin-bottom: 0.5rem;
+    padding: 0.5rem 1.25rem;
     background: var(--bg);
-    border-bottom: 1px solid var(--line);
+    border-top: 1px solid var(--line);
   }
   .touchbar-group {
     display: flex;
@@ -512,9 +512,5 @@ textarea::placeholder {
     min-height: 44px;
     padding: 0.5rem 0.7rem;
     line-height: 1;
-  }
-  .touchbar .btn:disabled {
-    opacity: 0.4;
-    cursor: default;
   }
 }
