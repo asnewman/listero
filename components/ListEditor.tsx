@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   datePickerStart,
   dateTagLabel,
@@ -21,7 +21,6 @@ type Focus = { id: string; pos: number };
 export default function ListEditor({ list, today, autoFocusTitle, onChange }: Props) {
   const [focus, setFocus] = useState<Focus | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const keyboardInset = useKeyboardInset();
   const titleRef = useRef<HTMLInputElement>(null);
   const items = list.items.map((item) => resolveDateTags(item, today));
   const [datePicker, setDatePicker] = useState<{ id: string | null; start: number; el: HTMLInputElement | HTMLTextAreaElement } | null>(null);
@@ -72,7 +71,7 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
   };
 
   /** Move items[i] and its subtree past the sibling above (dir -1) or below (dir 1). */
-  const moveItem = (i: number, dir: -1 | 1, pos: number) => {
+  const moveItem = (i: number, dir: -1 | 1, pos?: number) => {
     const item = items[i];
     const end = subtreeEnd(i);
     const block = items.slice(i, end);
@@ -87,22 +86,21 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
       const after = subtreeEnd(end);
       next = [...items.slice(0, i), ...items.slice(end, after), ...block, ...items.slice(after)];
     }
-    setItems(next, { id: item.id, pos });
+    setItems(next, pos === undefined ? undefined : { id: item.id, pos });
   };
 
-  /** Row holding the caret — the touch toolbar acts on it, having no keyboard to act through. */
+  /** Keep the last selected row available after the keyboard is dismissed. */
   const editing = () => {
     const i = items.findIndex((it) => it.id === editingId);
     if (i < 0) return null;
     const el = document.activeElement;
-    return { i, pos: el instanceof HTMLTextAreaElement ? el.selectionStart : items[i].text.length };
+    return { i, pos: el instanceof HTMLTextAreaElement ? el.selectionStart : undefined };
   };
 
   const nudgeDepth = (delta: number) => {
     const at = editing();
     if (!at) return;
     shiftDepth(at.i, delta);
-    setFocus({ id: items[at.i].id, pos: at.pos });
   };
 
   const nudgeMove = (dir: -1 | 1) => {
@@ -171,7 +169,12 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
     }
   };
 
-  const handleText = (i: number, text: string) => {
+  const handleText = (i: number, text: string, isComposing: boolean) => {
+    // Use input changes, not keydown: software keyboards may only send input events.
+    if (!isComposing && items[i].text === "" && text === " ") {
+      shiftDepth(i, 1);
+      return;
+    }
     setItems(items.map((it, k) => (k === i ? updateDateTaggedText(it, text, today) : it)));
   };
 
@@ -182,6 +185,25 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
 
   return (
     <div className="editor">
+      <div className="touchbar" role="group" aria-label="Bullet controls">
+        {/* Preserve focus if typing, but do not reopen a dismissed keyboard. */}
+        <div className="touchbar-group">
+          <button className="btn" disabled={!editingId} aria-label="Move up" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeMove(-1)}>
+            &#8593;
+          </button>
+          <button className="btn" disabled={!editingId} aria-label="Move down" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeMove(1)}>
+            &#8595;
+          </button>
+        </div>
+        <div className="touchbar-group">
+          <button className="btn" disabled={!editingId} aria-label="Outdent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(-1)}>
+            &#8676;
+          </button>
+          <button className="btn" disabled={!editingId} aria-label="Indent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(1)}>
+            &#8677;
+          </button>
+        </div>
+      </div>
       <div className="title-text">
         <div className="title-render" aria-hidden>
           <HighlightedDateText text={list.title} dateTags={list.titleDateTags} />
@@ -212,72 +234,29 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
             item={item}
             focus={focus?.id === item.id ? focus : null}
             onFocused={() => setFocus(null)}
-            onText={(t) => handleText(i, t)}
+            onText={(t, isComposing) => handleText(i, t, isComposing)}
             onDateTrigger={(el) => checkDatePicker(item.id, el)}
             onKeyDown={(e) => handleKeyDown(e, i)}
             onEnter={() => setEditingId(item.id)}
-            onLeave={() => setEditingId((cur) => (cur === item.id ? null : cur))}
           />
         ))}
       </div>
       {datePicker && <DatePicker today={today} onSelect={closeDatePicker} onCancel={() => closeDatePicker()} />}
-      {editingId && (
-        <div className="touchbar" style={{ bottom: keyboardInset }}>
-          {/* pointerdown is cancelled so tapping never blurs the row being edited */}
-          <div className="touchbar-group">
-            <button className="btn" aria-label="Move up" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeMove(-1)}>
-              &#8593;
-            </button>
-            <button className="btn" aria-label="Move down" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeMove(1)}>
-              &#8595;
-            </button>
-          </div>
-          <div className="touchbar-group">
-            <button className="btn" aria-label="Outdent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(-1)}>
-              &#8676;
-            </button>
-            <button className="btn" aria-label="Indent" onPointerDown={(e) => e.preventDefault()} onClick={() => nudgeDepth(1)}>
-              &#8677;
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
-}
-
-/** Height of the on-screen keyboard, so fixed UI can sit on top of it instead of behind it. */
-function useKeyboardInset() {
-  const [inset, setInset] = useState(0);
-
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
-    };
-  }, []);
-
-  return inset;
 }
 
 type RowProps = {
   item: ListItem;
   focus: Focus | null;
   onFocused: () => void;
-  onText: (text: string) => void;
+  onText: (text: string, isComposing: boolean) => void;
   onDateTrigger: (el: HTMLTextAreaElement) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onEnter: () => void;
-  onLeave: () => void;
 };
 
-function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter, onLeave }: RowProps) {
+function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter }: RowProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [lineCount, setLineCount] = useState(1);
 
@@ -331,13 +310,12 @@ function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter
           rows={1}
           value={item.text}
           onChange={(e) => {
-            onText(e.target.value);
+            onText(e.target.value, (e.nativeEvent as InputEvent).isComposing);
             if (!(e.nativeEvent as InputEvent).isComposing) onDateTrigger(e.currentTarget);
           }}
           onCompositionEnd={(e) => onDateTrigger(e.currentTarget)}
           onKeyDown={onKeyDown}
           onFocus={onEnter}
-          onBlur={onLeave}
           spellCheck={false}
         />
       </div>

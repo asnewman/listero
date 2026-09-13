@@ -486,8 +486,7 @@ textarea::placeholder {
   }
 }
 
-/* indent/outdent for touch keyboards, which have no Tab key. `bottom` is set inline
-   to the keyboard height so the bar rides above it. */
+/* Keep bullet controls above the title, independent of the software keyboard. */
 .touchbar {
   display: none;
 }
@@ -495,15 +494,14 @@ textarea::placeholder {
 @media (pointer: coarse) {
   .touchbar {
     display: flex;
-    position: fixed;
-    left: 0;
-    right: 0;
+    position: sticky;
+    top: 0;
     z-index: 10;
     justify-content: space-between;
-    padding: 0.5rem 1.25rem;
-    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+    padding: calc(0.5rem + env(safe-area-inset-top)) 0 0.5rem;
+    margin-bottom: 0.5rem;
     background: var(--bg);
-    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
   }
   .touchbar-group {
     display: flex;
@@ -511,7 +509,12 @@ textarea::placeholder {
   }
   .touchbar .btn {
     min-width: 3rem;
+    min-height: 44px;
     padding: 0.5rem 0.7rem;
     line-height: 1;
+  }
+  .touchbar .btn:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 }
