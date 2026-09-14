@@ -36,9 +36,10 @@ function cleanItems(items: unknown): ListItem[] {
     const it = raw as Partial<ListItem>;
     assertId(it.id);
     if (typeof it.text !== "string") throw new Error("Invalid item text");
+    if (it.checked !== undefined && typeof it.checked !== "boolean") throw new Error("Invalid item checked state");
     const depth = Number.isInteger(it.depth) ? Math.min(Math.max(it.depth as number, 0), MAX_DEPTH) : 0;
     const dateTags = cleanDateTags(it.dateTags, it.text);
-    return dateTags === undefined ? { id: it.id, text: it.text, depth } : { id: it.id, text: it.text, depth, dateTags };
+    return { id: it.id, text: it.text, depth, checked: it.checked ?? false, ...(dateTags === undefined ? {} : { dateTags }) };
   });
 }
 

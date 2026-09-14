@@ -8,6 +8,7 @@ export type ListItem = {
   id: string;
   text: string;
   depth: number;
+  checked?: boolean;
   dateTags?: DateTag[];
 };
 

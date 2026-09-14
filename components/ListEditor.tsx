@@ -250,6 +250,7 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
             focus={focus?.id === item.id ? focus : null}
             onFocused={() => setFocus(null)}
             onText={(t, isComposing) => handleText(i, t, isComposing)}
+            onToggleChecked={() => setItems(items.map((it, k) => k === i ? { ...it, checked: !it.checked } : it))}
             onDateTrigger={(el) => checkDatePicker(item.id, el)}
             onKeyDown={(e) => handleKeyDown(e, i)}
             onEnter={() => setEditingId(item.id)}
@@ -295,13 +296,14 @@ type RowProps = {
   focus: Focus | null;
   onFocused: () => void;
   onText: (text: string, isComposing: boolean) => void;
+  onToggleChecked: () => void;
   onDateTrigger: (el: HTMLTextAreaElement) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onEnter: () => void;
   onLeave: () => void;
 };
 
-function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter, onLeave }: RowProps) {
+function Row({ item, focus, onFocused, onText, onToggleChecked, onDateTrigger, onKeyDown, onEnter, onLeave }: RowProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [lineCount, setLineCount] = useState(1);
 
@@ -338,9 +340,22 @@ function Row({ item, focus, onFocused, onText, onDateTrigger, onKeyDown, onEnter
 
   return (
     <div
-      className={`item${item.depth % 2 === 1 ? " item-shaded" : ""}`}
+      className={`item${item.depth % 2 === 1 ? " item-shaded" : ""}${item.checked ? " item-checked" : ""}`}
       style={{ marginLeft: `${item.depth * 1.5}rem` }}
     >
+      <button
+        type="button"
+        className="item-check"
+        aria-label={item.checked ? "Uncheck item" : "Check item"}
+        aria-pressed={!!item.checked}
+        title={item.checked ? "Uncheck item" : "Check item"}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onToggleChecked}
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="m3 8 3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
       <span className="continuations" aria-hidden>
         {Array.from({ length: lineCount - 1 }, (_, i) => (
           <span key={i}>↳</span>
