@@ -249,8 +249,10 @@ export default function Sidebar({
           onDragEnd={endDrag}
           {...dropProps(f.id)}
         >
-          <button className="nav-item" onClick={() => toggle(f.id)} title={f.name || "Untitled"}>
-            <span className="chevron">{isCollapsed ? "▸" : "▾"}</span>
+          <button className="nav-item" onClick={() => toggle(f.id)} title={f.name || "Untitled"} aria-expanded={!isCollapsed}>
+            <svg className="chevron" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d={isCollapsed ? "m7 4 6 6-6 6" : "m4 7 6 6 6-6"} />
+            </svg>
             {f.name || <span className="muted">Untitled</span>}
           </button>
           <button

@@ -104,9 +104,11 @@ textarea {
 
 .chevron {
   display: inline-block;
-  width: 1rem;
-  color: var(--muted);
-  font-size: 0.7rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-right: 0.3rem;
+  vertical-align: -0.25rem;
+  color: var(--fg);
 }
 
 .nav li.active {
@@ -329,7 +331,6 @@ textarea::placeholder {
   position: relative;
   display: flex;
   align-items: flex-start;
-  padding-left: 1.5rem;
   background: var(--bg);
 }
 
@@ -340,7 +341,7 @@ textarea::placeholder {
 .continuations {
   position: absolute;
   top: calc(1.5em + 0.2rem);
-  left: 0;
+  left: -1.2rem;
   color: var(--muted);
   width: 0.9rem;
   text-align: center;

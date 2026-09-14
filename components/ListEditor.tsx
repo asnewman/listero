@@ -134,6 +134,11 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
     }
 
     if (e.key === "Backspace" && start === 0 && end === 0) {
+      if (item.depth > 0) {
+        e.preventDefault();
+        shiftDepth(i, -1);
+        return;
+      }
       if (i > 0) {
         e.preventDefault();
         const prev = items[i - 1];
