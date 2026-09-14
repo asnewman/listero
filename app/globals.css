@@ -361,8 +361,7 @@ textarea::placeholder {
 }
 
 .item:hover .item-check,
-.item:focus-within .item-check,
-.item-checked .item-check {
+.item:focus-within .item-check {
   opacity: 1;
 }
 

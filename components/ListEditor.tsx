@@ -250,7 +250,10 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
             focus={focus?.id === item.id ? focus : null}
             onFocused={() => setFocus(null)}
             onText={(t, isComposing) => handleText(i, t, isComposing)}
-            onToggleChecked={() => setItems(items.map((it, k) => k === i ? { ...it, checked: !it.checked } : it))}
+            onToggleChecked={(includeChildren) => {
+              const end = includeChildren ? subtreeEnd(i) : i + 1;
+              setItems(items.map((it, k) => k >= i && k < end ? { ...it, checked: !item.checked } : it));
+            }}
             onDateTrigger={(el) => checkDatePicker(item.id, el)}
             onKeyDown={(e) => handleKeyDown(e, i)}
             onEnter={() => setEditingId(item.id)}
@@ -296,7 +299,7 @@ type RowProps = {
   focus: Focus | null;
   onFocused: () => void;
   onText: (text: string, isComposing: boolean) => void;
-  onToggleChecked: () => void;
+  onToggleChecked: (includeChildren: boolean) => void;
   onDateTrigger: (el: HTMLTextAreaElement) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onEnter: () => void;
@@ -348,9 +351,9 @@ function Row({ item, focus, onFocused, onText, onToggleChecked, onDateTrigger, o
         className="item-check"
         aria-label={item.checked ? "Uncheck item" : "Check item"}
         aria-pressed={!!item.checked}
-        title={item.checked ? "Uncheck item" : "Check item"}
+        title={`${item.checked ? "Uncheck item" : "Check item"} (Shift-click to include children)`}
         onMouseDown={(e) => e.preventDefault()}
-        onClick={onToggleChecked}
+        onClick={(e) => onToggleChecked(e.shiftKey)}
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="m3 8 3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
