@@ -338,6 +338,10 @@ textarea::placeholder {
   background: var(--bg-2);
 }
 
+.item:focus-within {
+  background-image: linear-gradient(rgb(255 220 100 / 5%), rgb(255 220 100 / 5%));
+}
+
 .continuations {
   position: absolute;
   top: calc(1.5em + 0.2rem);
