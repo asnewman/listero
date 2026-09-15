@@ -343,6 +343,10 @@ textarea::placeholder {
   background-image: linear-gradient(rgb(255 220 100 / 5%), rgb(255 220 100 / 5%));
 }
 
+.item.item-selected {
+  background: color-mix(in srgb, var(--accent) 30%, var(--bg));
+}
+
 .item-check {
   position: absolute;
   top: 0.4rem;

@@ -18,6 +18,8 @@ A writing canvas that only allows lists.
 - `Tab` / `Shift+Tab` — indent / outdent (moves nested items with it)
 - `Backspace` at the start of an item — merge into the previous item
 - `↑` / `↓` — move between items
+- Drag across bullets or use `Shift+↑` / `Shift+↓` — select whole bullets; copy or cut with `Cmd/Ctrl+C` / `Cmd/Ctrl+X`, then paste into another list. Nesting, checkmarks, and date tags are preserved. `Escape` clears the selection.
+- `Alt+Shift+↑` / `Alt+Shift+↓` — move a bullet and its nested items
 - `@yesterday` / `@today` / `@tomorrow` — add a date tag to a title or item that updates as time passes
 - `@date` — open a calendar in a title or item; select a day to save a date tag, or press `Escape` to cancel
 

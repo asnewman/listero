@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   datePickerStart,
   dateTagLabel,
+  isValidDateTag,
   mergeDateTaggedItems,
   resolveDateTags,
   selectDateTag,
@@ -21,6 +22,10 @@ type Focus = { id: string; pos: number };
 export default function ListEditor({ list, today, autoFocusTitle, onChange }: Props) {
   const [focus, setFocus] = useState<Focus | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<{ anchor: number; end: number } | null>(null);
+  const dragAnchor = useRef<number | null>(null);
+  const selectionStart = selection ? Math.min(selection.anchor, selection.end) : -1;
+  const selectionEnd = selection ? Math.max(selection.anchor, selection.end) : -1;
   const keyboardInset = useKeyboardInset();
   const titleRef = useRef<HTMLInputElement>(null);
   const items = list.items.map((item) => resolveDateTags(item, today));
@@ -53,6 +58,55 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
   const setItems = (next: ListItem[], nextFocus?: Focus) => {
     onChange({ title: list.title, titleDateTags: list.titleDateTags, items: next });
     if (nextFocus) setFocus(nextFocus);
+  };
+
+  const copyItems = (e: React.ClipboardEvent, cut = false) => {
+    if (!selection) return;
+    e.preventDefault();
+    const selected = items.slice(selectionStart, selectionEnd + 1);
+    const base = Math.min(...selected.map((item) => item.depth));
+    e.clipboardData.setData("text/plain", selected.map((item) => `${"\t".repeat(item.depth - base)}${item.text}`).join("\n"));
+    e.clipboardData.setData("application/x-listero-items", JSON.stringify(selected));
+    if (cut) {
+      const next = items.filter((_, i) => i < selectionStart || i > selectionEnd);
+      if (!next.length) next.push(newItem());
+      setSelection(null);
+      setItems(next, { id: next[Math.min(selectionStart, next.length - 1)].id, pos: 0 });
+    }
+  };
+
+  const pasteItems = (e: React.ClipboardEvent<HTMLTextAreaElement>, i: number) => {
+    const plain = e.clipboardData.getData("text/plain").replace(/\r\n?/g, "\n");
+    let pasted: ListItem[] | null = null;
+    try {
+      const data = JSON.parse(e.clipboardData.getData("application/x-listero-items"));
+      if (Array.isArray(data) && data.length && data.every((item) =>
+        item && typeof item.text === "string" && Number.isInteger(item.depth) && item.depth >= 0 && item.depth <= MAX_DEPTH
+      )) {
+        pasted = data.map((item) => resolveDateTags({
+          ...newItem(item.depth, item.text),
+          checked: item.checked === true,
+          dateTags: Array.isArray(item.dateTags) ? item.dateTags.filter((tag: unknown) => isValidDateTag(item.text, tag)) : [],
+        }, today));
+      }
+    } catch { /* Other applications only provide plain text. */ }
+    if (!pasted && !plain.includes("\n") && !selection) return;
+    e.preventDefault();
+    pasted ??= plain.split("\n").map((line) => {
+      const tabs = line.match(/^\t*/)?.[0].length ?? 0;
+      return resolveDateTags(newItem(Math.min(tabs, MAX_DEPTH), line.slice(tabs)), today);
+    });
+    const first = selection ? selectionStart : i;
+    const last = selection ? selectionEnd : i;
+    const base = Math.min(...pasted.map((item) => item.depth));
+    pasted = pasted.map((item) => ({ ...item, depth: Math.min(MAX_DEPTH, items[first].depth + item.depth - base) }));
+    const [before] = splitDateTaggedItem(items[first], selection ? 0 : e.currentTarget.selectionStart, items[first].text.length, today);
+    const [, after] = splitDateTaggedItem(items[last], 0, selection ? items[last].text.length : e.currentTarget.selectionEnd, today);
+    pasted[0] = { ...pasted[0], ...mergeDateTaggedItems({ ...items[first], ...before }, pasted[0], today) };
+    const caret = pasted.at(-1)!.text.length;
+    pasted[pasted.length - 1] = { ...pasted.at(-1)!, ...mergeDateTaggedItems(pasted.at(-1)!, { ...items[last], ...after }, today) };
+    setSelection(null);
+    setItems([...items.slice(0, first), ...pasted, ...items.slice(last + 1)], { id: pasted.at(-1)!.id, pos: caret });
   };
 
   /** Index just past the subtree rooted at `i` (following items deeper than items[i]). */
@@ -116,6 +170,26 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
     const start = el.selectionStart;
     const end = el.selectionEnd;
 
+    if (e.shiftKey && !e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      e.preventDefault();
+      const anchor = selection?.anchor ?? i;
+      const next = Math.max(0, Math.min(items.length - 1, (selection?.end ?? i) + (e.key === "ArrowUp" ? -1 : 1)));
+      setSelection({ anchor, end: next });
+      return;
+    }
+    if (selection) {
+      if (["Control", "Meta", "Shift", "Alt"].includes(e.key)) return;
+      if ((e.metaKey || e.ctrlKey) && ["c", "x", "v"].includes(e.key.toLowerCase())) return;
+      if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        const next = items.filter((_, k) => k < selectionStart || k > selectionEnd);
+        if (!next.length) next.push(newItem());
+        setItems(next, { id: next[Math.min(selectionStart, next.length - 1)].id, pos: 0 });
+      }
+      setSelection(null);
+      if (e.key === "Escape" || e.key === "Backspace" || e.key === "Delete") return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       const [before, after] = splitDateTaggedItem(item, start, end, today);
@@ -155,7 +229,7 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
 
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       const up = e.key === "ArrowUp";
-      if (e.shiftKey) {
+      if (e.shiftKey && e.altKey) {
         e.preventDefault();
         moveItem(i, up ? -1 : 1, start);
         return;
@@ -190,7 +264,10 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
   };
 
   return (
-    <div className="editor">
+    <div className="editor" onCopy={copyItems} onCut={(e) => copyItems(e, true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setSelection(null);
+      }}>
       {editingId && keyboardInset !== null && (
         <div
           className="touchbar"
@@ -242,11 +319,35 @@ export default function ListEditor({ list, today, autoFocusTitle, onChange }: Pr
           }}
         />
       </div>
-      <div className="items">
+      <div className="items"
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          setSelection(null);
+          if (e.pointerType === "touch" || !(e.target instanceof HTMLTextAreaElement)) return;
+          dragAnchor.current = Number(e.target.closest<HTMLElement>("[data-item-index]")!.dataset.itemIndex);
+        }}
+        onPointerMove={(e) => {
+          if (!(e.buttons & 1)) { dragAnchor.current = null; return; }
+          if (dragAnchor.current === null) return;
+          const row = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-item-index]");
+          if (!row) return;
+          const end = Number(row.dataset.itemIndex);
+          if (end !== dragAnchor.current || selection) {
+            e.preventDefault();
+            window.getSelection()?.removeAllRanges();
+            setSelection({ anchor: dragAnchor.current, end });
+          }
+        }}
+        onPointerUp={() => { dragAnchor.current = null; }}
+        onPointerCancel={() => { dragAnchor.current = null; }}
+      >
         {items.map((item, i) => (
           <Row
             key={item.id}
             item={item}
+            index={i}
+            selected={i >= selectionStart && i <= selectionEnd}
+            onPaste={(e) => pasteItems(e, i)}
             focus={focus?.id === item.id ? focus : null}
             onFocused={() => setFocus(null)}
             onText={(t, isComposing) => handleText(i, t, isComposing)}
@@ -296,6 +397,9 @@ function useKeyboardInset() {
 
 type RowProps = {
   item: ListItem;
+  index: number;
+  selected: boolean;
+  onPaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   focus: Focus | null;
   onFocused: () => void;
   onText: (text: string, isComposing: boolean) => void;
@@ -306,7 +410,7 @@ type RowProps = {
   onLeave: () => void;
 };
 
-function Row({ item, focus, onFocused, onText, onToggleChecked, onDateTrigger, onKeyDown, onEnter, onLeave }: RowProps) {
+function Row({ item, index, selected, onPaste, focus, onFocused, onText, onToggleChecked, onDateTrigger, onKeyDown, onEnter, onLeave }: RowProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [lineCount, setLineCount] = useState(1);
 
@@ -343,7 +447,8 @@ function Row({ item, focus, onFocused, onText, onToggleChecked, onDateTrigger, o
 
   return (
     <div
-      className={`item${item.depth % 2 === 1 ? " item-shaded" : ""}${item.checked ? " item-checked" : ""}`}
+      className={`item${item.depth % 2 === 1 ? " item-shaded" : ""}${item.checked ? " item-checked" : ""}${selected ? " item-selected" : ""}`}
+      data-item-index={index}
       style={{ marginLeft: `${item.depth * 1.5}rem` }}
     >
       <button
@@ -372,6 +477,8 @@ function Row({ item, focus, onFocused, onText, onToggleChecked, onDateTrigger, o
           ref={ref}
           rows={1}
           value={item.text}
+          aria-label={`Bullet ${index + 1}${selected ? ", selected" : ""}`}
+          onPaste={onPaste}
           onChange={(e) => {
             onText(e.target.value, (e.nativeEvent as InputEvent).isComposing);
             if (!(e.nativeEvent as InputEvent).isComposing) onDateTrigger(e.currentTarget);
